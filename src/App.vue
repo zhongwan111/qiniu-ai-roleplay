@@ -1,30 +1,64 @@
 <template>
-  <nav>
-    <router-link to="/">Home</router-link> |
-    <router-link to="/about">About</router-link>
-  </nav>
-  <router-view />
+  <div id="app" :class="{ 'mobile-app': isMobileDevice }">
+    <router-view />
+  </div>
 </template>
 
+<script lang="ts">
+import { defineComponent, ref, onMounted, onUnmounted } from "vue";
+import { getDeviceType, listenDeviceChange } from "./utils/device";
+
+export default defineComponent({
+  name: "App",
+  setup() {
+    const isMobileDevice = ref(getDeviceType() === "mobile");
+    let unlistenDeviceChange: (() => void) | null = null;
+
+    onMounted(() => {
+      // 监听设备类型变化
+      unlistenDeviceChange = listenDeviceChange((deviceType) => {
+        isMobileDevice.value = deviceType === "mobile";
+      });
+    });
+
+    onUnmounted(() => {
+      // 取消监听
+      if (unlistenDeviceChange) {
+        unlistenDeviceChange();
+      }
+    });
+
+    return {
+      isMobileDevice,
+    };
+  },
+});
+</script>
+
 <style lang="less">
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
+/* 全局样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: "Avenir", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-align: center;
   color: #2c3e50;
 }
 
-nav {
-  padding: 30px;
+#app {
+  height: 100%;
 
-  a {
-    font-weight: bold;
-    color: #2c3e50;
-
-    &.router-link-exact-active {
-      color: #42b983;
-    }
+  &.mobile-app {
+    max-width: 100%;
+    overflow-x: hidden;
+    font-size: 14px;
   }
 }
 </style>
