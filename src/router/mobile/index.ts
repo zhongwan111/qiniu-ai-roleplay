@@ -1,6 +1,5 @@
 import { RouteRecordRaw, createRouter, createWebHistory } from "vue-router";
 
-// 移动端路由
 const routes: Array<RouteRecordRaw> = [
   {
     path: "/",
@@ -8,14 +7,6 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import("@/views/mobile/Home.vue"),
     meta: {
       title: "首页",
-    },
-  },
-  {
-    path: "/about",
-    name: "About",
-    component: () => import("@/views/mobile/About.vue"),
-    meta: {
-      title: "关于我们",
     },
   },
   {
@@ -28,7 +19,6 @@ const routes: Array<RouteRecordRaw> = [
   },
 ];
 
-// 创建移动端路由
 const mobileRouter = createRouter({
   history: createWebHistory(),
   routes,

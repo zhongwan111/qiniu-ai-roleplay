@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 
-// 定义用户状态接口
 interface UserState {
   id: string | null;
   name: string | null;
@@ -9,14 +8,12 @@ interface UserState {
 
 // 创建用户状态存储
 export const useUserStore = defineStore("user", {
-  // 状态
   state: (): UserState => ({
     id: null,
     name: null,
     isLoggedIn: false,
   }),
 
-  // getters
   getters: {
     // 获取用户信息
     userInfo(): { id: string | null; name: string | null } {
@@ -27,7 +24,6 @@ export const useUserStore = defineStore("user", {
     },
   },
 
-  // actions
   actions: {
     // 登录
     login(id: string, name: string) {
