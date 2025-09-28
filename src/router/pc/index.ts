@@ -11,14 +11,6 @@ const routes: Array<RouteRecordRaw> = [
     },
   },
   {
-    path: "/about",
-    name: "About",
-    component: () => import("@/views/pc/About.vue"),
-    meta: {
-      title: "关于我们",
-    },
-  },
-  {
     path: "/:pathMatch(.*)*",
     name: "NotFound",
     component: () => import("@/views/pc/NotFound.vue"),

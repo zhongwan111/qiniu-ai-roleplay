@@ -96,7 +96,7 @@ export default defineComponent({
   z-index: 1000;
   transition: all 0.6s ease-in-out;
 
-  // 视频背景样式 - 移动端优化
+  // 视频背景样式 - 移动端
   .video-background {
     position: absolute;
     top: 50%;
@@ -109,7 +109,6 @@ export default defineComponent({
     z-index: -1;
     object-fit: cover;
 
-    // 确保视频在加载时不会闪烁
     background-color: #000;
 
     // 移动端特定优化
@@ -119,7 +118,7 @@ export default defineComponent({
   // 内容覆盖层
   .content-overlay {
     position: absolute;
-    bottom: 15%;
+    bottom: 5%;
     left: 0;
     right: 0;
     z-index: 1;

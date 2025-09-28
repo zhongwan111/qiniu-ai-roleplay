@@ -10,7 +10,7 @@ export class LLMService {
   // 调用LLM API
   static async chat(
     userMessage: string,
-    systemPrompt?: string
+    promptKey = "default"
   ): Promise<string> {
     const config = getCurrentLLMConfig();
 
@@ -20,10 +20,13 @@ export class LLMService {
       );
     }
 
+    // 根据promptKey获取对应的提示词
+    const systemPrompt = SYSTEM_PROMPTS[promptKey] || SYSTEM_PROMPTS.default;
+
     const messages: ChatMessage[] = [
       {
         role: "system",
-        content: systemPrompt || SYSTEM_PROMPTS.default,
+        content: systemPrompt,
       },
       {
         role: "user",
@@ -34,10 +37,10 @@ export class LLMService {
     switch (config.name) {
       case "通义千问":
         return await this.callQwenAPI(config, messages);
-      case "OpenAI GPT":
-        return await this.callOpenAIAPI(config, messages);
-      case "智谱ChatGLM":
-        return await this.callZhipuAPI(config, messages);
+      // case "OpenAI GPT":
+      //   return await this.callOpenAIAPI(config, messages);
+      // case "智谱ChatGLM":
+      //   return await this.callZhipuAPI(config, messages);
       default:
         throw new Error(`不支持的LLM服务: ${config.name}`);
     }
@@ -81,78 +84,6 @@ export class LLMService {
       return data.output.choices[0].message.content;
     } else {
       throw new Error("通义千问API响应格式错误");
-    }
-  }
-
-  // OpenAI API调用
-  private static async callOpenAIAPI(
-    config: any,
-    messages: ChatMessage[]
-  ): Promise<string> {
-    const requestBody = {
-      model: config.model,
-      messages,
-      temperature: 0.7,
-      max_tokens: 150,
-    };
-
-    const response = await fetch(config.apiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("OpenAI API调用失败:", response.status, errorData);
-      throw new Error(`OpenAI API调用失败: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.choices?.[0]?.message?.content) {
-      return data.choices[0].message.content;
-    } else {
-      throw new Error("OpenAI API响应格式错误");
-    }
-  }
-
-  // 智谱API调用
-  private static async callZhipuAPI(
-    config: any,
-    messages: ChatMessage[]
-  ): Promise<string> {
-    const requestBody = {
-      model: config.model,
-      messages,
-      temperature: 0.7,
-      max_tokens: 150,
-    };
-
-    const response = await fetch(config.apiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("智谱API调用失败:", response.status, errorData);
-      throw new Error(`智谱API调用失败: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.choices?.[0]?.message?.content) {
-      return data.choices[0].message.content;
-    } else {
-      throw new Error("智谱API响应格式错误");
     }
   }
 }

@@ -30,10 +30,10 @@ export default defineComponent({
     // 控制遮罩层显示状态
     const showMask = ref(true);
 
-    // 视频源路径 - 使用public目录中的文件
+    // 视频源路径
     const videoSrc = "/videos/qiniu_cover.mp4";
 
-    // 进入应用的方法
+    // 进入应用
     const enterApp = () => {
       showMask.value = false;
     };

@@ -1,20 +1,38 @@
 <template>
   <div class="voice-chat-container">
-    <!-- 背景视频 - 雷军形象 -->
+    <!-- 背景视频 - 双视频切换 -->
     <video
-      ref="backgroundVideo"
+      ref="backgroundVideo1"
       class="background-video"
+      :class="{ active: activeVideoIndex === 0 }"
       autoplay
       muted
       loop
       playsinline
       webkit-playsinline
     >
-      <source :src="currentVideoSrc" type="video/mp4" />
+      <source :src="video1Src" type="video/mp4" />
+    </video>
+    <video
+      ref="backgroundVideo2"
+      class="background-video"
+      :class="{ active: activeVideoIndex === 1 }"
+      autoplay
+      muted
+      loop
+      playsinline
+      webkit-playsinline
+    >
+      <source :src="video2Src" type="video/mp4" />
     </video>
 
     <!-- 语音对话界面 -->
     <div class="voice-interface">
+      <!-- 角色选择器 -->
+      <div class="character-selector-container">
+        <CharacterSelector @character-change="handleCharacterChange" />
+      </div>
+
       <!-- 对话状态显示 -->
       <div class="status-display">
         <div v-if="isListening" class="status-item listening">
@@ -23,14 +41,14 @@
         </div>
         <div v-else-if="isProcessing" class="status-item processing">
           <div class="loading-spinner"></div>
-          <span>雷总思考中...</span>
+          <span>{{ currentCharacter.displayName }}思考中...</span>
         </div>
         <div v-else-if="isSpeaking" class="status-item speaking">
           <div class="sound-wave"></div>
-          <span>雷总回答中...</span>
+          <span>{{ currentCharacter.displayName }}回答中...</span>
         </div>
         <div v-else class="status-item idle">
-          <span>点击下方按钮，与雷总对话</span>
+          <span>点击下方按钮，与{{ currentCharacter.displayName }}对话</span>
         </div>
       </div>
 
@@ -97,7 +115,9 @@
           </svg>
         </button>
         <span class="button-label">
-          {{ isListening ? "停止录音" : "与雷总对话" }}
+          {{
+            isListening ? "停止录音" : `与${currentCharacter.displayName}对话`
+          }}
         </span>
       </div>
 
@@ -119,6 +139,9 @@ import {
   nextTick,
 } from "vue";
 import { LLMService } from "@/services/llm-service";
+import CharacterSelector from "./CharacterSelector.vue";
+import { getDefaultCharacter } from "@/config/character-config";
+import type { CharacterConfig } from "@/config/character-config";
 
 interface Message {
   type: "user" | "ai";
@@ -127,7 +150,6 @@ interface Message {
   timestamp: number;
 }
 
-// 简化的类型声明，避免与浏览器内置类型冲突
 declare global {
   interface Window {
     SpeechRecognition: any;
@@ -137,43 +159,89 @@ declare global {
 
 export default defineComponent({
   name: "VoiceChat",
+  components: {
+    CharacterSelector,
+  },
   setup() {
-    // 状态管理
     const isListening = ref(false);
     const isProcessing = ref(false);
     const isSpeaking = ref(false);
     const errorMessage = ref("");
     const conversation = reactive<Message[]>([]);
 
-    // 视频切换相关
-    const backgroundVideo = ref<HTMLVideoElement | null>(null);
-    const currentVideoSrc = ref("/videos/leijun.mp4"); // 默认静默状态
+    // 角色管理
+    const currentCharacter = ref<CharacterConfig>(getDefaultCharacter());
 
-    // 视频文件路径配置
-    const videoSources = {
-      idle: "/videos/leijun.mp4", // 静默状态视频
-      speaking: "/videos/leijun_speak.mp4", // 讲话状态视频
-    };
+    // 静默/讲话视频切换相关
+    const backgroundVideo1 = ref<HTMLVideoElement | null>(null);
+    const backgroundVideo2 = ref<HTMLVideoElement | null>(null);
+    const activeVideoIndex = ref(0); // 0 或 1，表示当前显示的视频
+    const video1Src = ref(currentCharacter.value.videos.idle);
+    const video2Src = ref(currentCharacter.value.videos.idle);
 
     // 语音识别相关
     let recognition: any = null;
     let synthesis: any = null;
 
-    // 视频切换方法
-    const switchVideo = (state: "idle" | "speaking") => {
-      const newSrc = videoSources[state];
-      if (currentVideoSrc.value !== newSrc) {
-        currentVideoSrc.value = newSrc;
+    const generateFallbackResponse = (
+      text: string,
+      character: CharacterConfig
+    ): string => {
+      switch (character.id) {
+        case "leijun":
+          return `Are you OK？AI服务暂时不可用，不过我听到您说的是："${text}"。等会儿我们再聊聊小米的黑科技！`;
+        case "wukong":
+          return `俺老孙的法力暂时受阻，不过听到你这厮说："${text}"。等俺恢复法力再好好聊聊！`;
+        case "einstein":
+          return `抱歉，我的思维网络暂时中断了。不过我听到您说："${text}"。让我们稍后继续探讨宇宙的奥秘吧！`;
+        default:
+          return `AI服务暂时不可用，我听到您说的是："${text}"。请稍后再试。`;
+      }
+    };
 
-        // 等待下一帧更新视频元素
-        nextTick(() => {
-          if (backgroundVideo.value) {
-            backgroundVideo.value.load(); // 重新加载视频
-            backgroundVideo.value.play().catch((error) => {
-              console.warn("视频自动播放失败:", error);
-            });
-          }
+    // 角色切换处理
+    const handleCharacterChange = (character: CharacterConfig) => {
+      currentCharacter.value = character;
+      // 切换到新角色的静默状态视频
+      switchVideo("idle");
+    };
+
+    const switchVideo = (state: "idle" | "speaking") => {
+      const newSrc = currentCharacter.value.videos[state];
+
+      // 获取当前非活动的视频元素
+      const inactiveVideoIndex = activeVideoIndex.value === 0 ? 1 : 0;
+      const inactiveVideo =
+        inactiveVideoIndex === 0
+          ? backgroundVideo1.value
+          : backgroundVideo2.value;
+      const inactiveVideoSrcRef =
+        inactiveVideoIndex === 0 ? video1Src : video2Src;
+
+      // 检查是否需要切换
+      const currentActiveSrc =
+        activeVideoIndex.value === 0 ? video1Src.value : video2Src.value;
+      if (currentActiveSrc === newSrc) {
+        return; // 无需切换
+      }
+
+      // 预加载新视频到非活动元素
+      inactiveVideoSrcRef.value = newSrc;
+
+      // 等待视频加载完成后再切换
+      if (inactiveVideo) {
+        const switchWhenReady = () => {
+          // 切换视频索引
+          activeVideoIndex.value = inactiveVideoIndex;
+        };
+
+        // 监听视频加载
+        inactiveVideo.addEventListener("loadeddata", switchWhenReady, {
+          once: true,
         });
+        inactiveVideo.load();
+        // 如果视频加载失败或超时，仍然切换
+        setTimeout(switchWhenReady, 1000);
       }
     };
 
@@ -221,7 +289,7 @@ export default defineComponent({
 
         if (finalTranscript) {
           console.log("识别结果:", finalTranscript);
-          addMessage("user", "用户", finalTranscript);
+          addMessage("user", "我", finalTranscript);
           processUserInput(finalTranscript);
         }
       };
@@ -287,24 +355,29 @@ export default defineComponent({
       errorMessage.value = "";
 
       try {
-        // 使用统一的LLM服务，默认使用雷军人设
-        const aiResponse = await LLMService.chat(text);
-        addMessage("ai", "雷军", aiResponse);
+        // 使用统一的LLM服务，根据当前角色使用对应人设
+        const aiResponse = await LLMService.chat(
+          text,
+          currentCharacter.value.promptKey
+        );
+        addMessage("ai", currentCharacter.value.name, aiResponse);
         speakText(aiResponse);
       } catch (error) {
         console.error("处理用户输入失败:", error);
         const errorMsg = (error as Error).message;
 
         if (errorMsg.includes("配置") || errorMsg.includes("启用")) {
-          // 配置问题，显示具体错误信息
           errorMessage.value = errorMsg;
         } else {
           errorMessage.value = "AI处理失败，请重试";
         }
 
-        // 降级到模拟响应
-        const fallbackResponse = `Are you OK？AI服务暂时不可用，不过我听到您说的是："${text}"。等会儿我们再聊聊小米的黑科技！`;
-        addMessage("ai", "雷军", fallbackResponse);
+        // 根据角色使用不同的回复
+        const fallbackResponse = generateFallbackResponse(
+          text,
+          currentCharacter.value
+        );
+        addMessage("ai", currentCharacter.value.name, fallbackResponse);
         speakText(fallbackResponse);
       } finally {
         isProcessing.value = false;
@@ -370,8 +443,13 @@ export default defineComponent({
       errorMessage,
       conversation,
       toggleVoiceRecording,
-      backgroundVideo,
-      currentVideoSrc,
+      backgroundVideo1,
+      backgroundVideo2,
+      activeVideoIndex,
+      video1Src,
+      video2Src,
+      currentCharacter,
+      handleCharacterChange,
     };
   },
 });
@@ -397,7 +475,12 @@ export default defineComponent({
   transform: translate(-50%, -50%);
   z-index: 0;
   object-fit: cover;
-  opacity: 0.7;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+
+  &.active {
+    opacity: 0.7;
+  }
 }
 
 .voice-interface {
@@ -414,6 +497,13 @@ export default defineComponent({
     rgba(0, 0, 0, 0.1) 50%,
     rgba(0, 0, 0, 0.4) 100%
   );
+}
+
+.character-selector-container {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 200;
 }
 
 .status-display {
@@ -515,6 +605,7 @@ export default defineComponent({
   overflow-y: auto;
   padding: 20px 0;
   max-height: 40vh;
+  margin-top: 40px;
 
   .message {
     margin-bottom: 16px;
@@ -634,6 +725,7 @@ export default defineComponent({
   .conversation-display {
     max-height: 35vh;
     padding: 15px 0;
+    margin-top: 220px;
 
     .message .message-content {
       font-size: 13px;
